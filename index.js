@@ -1,7 +1,5 @@
 'use strict';
 
-require('dotenv').config();
-
 const VTUBER_META_LIST_FILENAME = process.env.VTUBER_META_LIST_FILENAME || 'vtuber-meta-list.json';
 const KAFKA_BROKERS = process.env.KAFKA_BROKERS;
 const HOSTNAME = process.env.HOSTNAME; // offered by kubernetes automatically
@@ -31,11 +29,19 @@ async function init() {
   console.info(`connecting to kafka with brokers: ${KAFKA_BROKERS}`);
   await fetchTaskScheduleProducer.connect();
 
-  console.info(`sending ${metaList.length} scheduled tasks to kafka`);
+  console.info(`sending ${metaList.length} tasks to kafka`);
   await fetchTaskScheduleProducer.send({
+    acks: -1,
     topic: 'fetch-task-schedule',
-    messages: metaList.map((m) => ({ values: JSON.stringify(m) }))
+    messages: metaList.map((m) => ({
+      value: JSON.stringify({
+        scheduledTimestamp: new Date().toISOString(),
+        vtuberMeta: m
+      })
+    }))
   });
+
+  console.info('finished, bye');
 }
 
 init().catch((err) => console.error(err));

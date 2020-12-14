@@ -1,63 +1,66 @@
 version: v1beta9
+vars:
+  - name: ENV_KAFKA_BROKERS
+    source: env
 images:
   app:
     image: devspace
     preferSyncOverRebuild: true
     injectRestartHelper: true
     appendDockerfileInstructions:
-    - USER root
+      - USER root
     build:
       docker:
         skipPush: true
 deployments:
-- name: fetch-task-notifier
-  helm:
-    componentChart: true
-    values:
-      containers:
-      - image: devspace
-        volumeMounts:
-          - containerPath: /app/vtuber-meta-list.json
-            volume:
+  - name: fetch-task-notifier
+    helm:
+      componentChart: true
+      values:
+        containers:
+          - image: devspace
+            volumeMounts:
+              - containerPath: /app/vtuber-meta-list.json
+                volume:
+                  name: vtuber-meta-list
+                  subPath: vtuber-meta-list.json
+                  readOnly: true
+            env:
+              - name: KAFKA_BROKERS
+                value: '${ENV_KAFKA_BROKERS}'
+        service:
+          ports:
+            - port: 9229
+        volumes:
+          - name: vtuber-meta-list
+            configMap:
               name: vtuber-meta-list
-              subPath: vtuber-meta-list.json
-              readOnly: true
-      service:
-        ports:
-        - port: 3000
-      volumes:
-        - name: vtuber-meta-list
-          configMap:
-            name: vtuber-meta-list
-
 dev:
-  open:
-  - url: http://localhost:3000
   sync:
-  - imageName: app
-    excludePaths:
-    - .git/
-    uploadExcludePaths:
-    - Dockerfile
-    - node_modules/
-    - devspace.yaml
-    onUpload:
-      restartContainer: true
+    - imageName: app
+      excludePaths:
+        - .git/
+      uploadExcludePaths:
+        - Dockerfile
+        - node_modules/
+        - devspace.yaml
+      onUpload:
+        restartContainer: true
 profiles:
-- name: production
-  patches:
-  - op: remove
-    path: images.app.injectRestartHelper
-  - op: remove
-    path: images.app.appendDockerfileInstructions
-- name: interactive
-  patches:
-  - op: add
-    path: dev.interactive
-    value:
-      defaultEnabled: true
-  - op: add
-    path: images.app.entrypoint
-    value:
-    - sleep
-    - "9999999999"
+  - name: production
+    patches:
+      - op: remove
+        path: images.app.injectRestartHelper
+      - op: remove
+        path: images.app.appendDockerfileInstructions
+  - name: interactive
+    patches:
+      - op: add
+        path: dev.interactive
+        value:
+          defaultEnabled: true
+      - op: add
+        path: images.app.entrypoint
+        value:
+          - sleep
+          - '9999999999'
