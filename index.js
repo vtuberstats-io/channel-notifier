@@ -26,7 +26,7 @@ async function init() {
   console.info(`loading vtuber meta list from ${VTUBER_META_LIST_FILENAME}`);
   const metaList = JSON.parse(fs.readFileSync(VTUBER_META_LIST_FILENAME).toString());
 
-  console.info(`connecting to kafka with brokers: ${KAFKA_BROKERS}`);
+  console.info('connecting to kafka brokers');
   await fetchTaskScheduleProducer.connect();
 
   console.info(`sending ${metaList.length} tasks to kafka`);
