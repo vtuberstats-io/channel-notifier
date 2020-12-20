@@ -7,7 +7,7 @@ if (!MONGODB_URL || !KAFKA_BROKERS || !HOSTNAME) {
   process.exit(1);
 }
 
-const { registerExitHook } = require('./lib/exit-hook');
+const { addExitHook, registerExitListener } = require('./lib/exit-hook');
 const { Kafka } = require('kafkajs');
 const MongoClient = require('mongodb').MongoClient;
 
@@ -21,9 +21,11 @@ const mongo = new MongoClient(MONGODB_URL);
 async function init() {
   console.info('connecting to kafka brokers');
   await fetchTaskScheduleProducer.connect();
+  addExitHook(async () => await fetchTaskScheduleProducer.disconnect());
 
   console.info('connecting to mongodb');
   await mongo.connect();
+  addExitHook(async () => await mongo.close());
 
   console.info('reading metadata from mongodb');
   const db = mongo.db('vtuberstats');
@@ -61,6 +63,5 @@ async function init() {
   console.info('finished, bye');
 }
 
-registerExitHook(async () => await fetchTaskScheduleProducer.disconnect());
-
+registerExitListener();
 init();
