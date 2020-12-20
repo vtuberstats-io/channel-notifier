@@ -1,42 +1,59 @@
-'use strict';
-
-const VTUBER_META_LIST_FILENAME = process.env.VTUBER_META_LIST_FILENAME || 'vtuber-meta-list.json';
+const MONGODB_URL = process.env.MONGODB_URL;
 const KAFKA_BROKERS = process.env.KAFKA_BROKERS;
 const HOSTNAME = process.env.HOSTNAME; // offered by kubernetes automatically
 
-if (!KAFKA_BROKERS) {
-  console.error('environment variable KAFKA_BROKERS is not specified!');
-  process.exit(1);
-}
-if (!HOSTNAME) {
-  console.error('environment variable HOSTNAME is not specified!');
+if (!MONGODB_URL || !KAFKA_BROKERS || !HOSTNAME) {
+  console.error(`missing environment variables, env: ${JSON.stringify(process.env)}`);
   process.exit(1);
 }
 
+const { registerExitHook } = require('./lib/exit-hook');
 const { Kafka } = require('kafkajs');
-const fs = require('fs');
+const MongoClient = require('mongodb').MongoClient;
 
 const kafka = new Kafka({
   clientId: HOSTNAME,
   brokers: KAFKA_BROKERS.trim().split(',')
 });
 const fetchTaskScheduleProducer = kafka.producer();
+const mongo = new MongoClient(MONGODB_URL);
 
 async function init() {
-  console.info(`loading vtuber meta list from ${VTUBER_META_LIST_FILENAME}`);
-  const metaList = JSON.parse(fs.readFileSync(VTUBER_META_LIST_FILENAME).toString());
-
   console.info('connecting to kafka brokers');
   await fetchTaskScheduleProducer.connect();
 
+  console.info('connecting to mongodb');
+  await mongo.connect();
+
+  console.info('reading metadata from mongodb');
+  const db = mongo.db('vtuberstats');
+  const vtuberMetaCollection = db.collection('vtuber-meta');
+  const vtuberMetaList = (await vtuberMetaCollection.find({}).toArray()).map((item) => ({
+    domain: item.domain,
+    kind: 'vtuber',
+    id: item.id,
+    channelId: item.channelId
+  }));
+  const groupMetaCollection = db.collection('group-meta');
+  const groupMetaList = (await groupMetaCollection.find({ type: 'physical' }).toArray()).map(
+    (item) => ({
+      domain: item.domain,
+      kind: 'group',
+      id: item.id,
+      channelId: item.channelId
+    })
+  );
+
+  const metaList = [...vtuberMetaList, ...groupMetaList];
+  const scheduledTimestamp = new Date().toISOString();
   console.info(`sending ${metaList.length} tasks to kafka`);
   await fetchTaskScheduleProducer.send({
     acks: -1,
-    topic: 'fetch-task-schedule',
-    messages: metaList.map((m) => ({
+    topic: 'fetch-channel-info',
+    messages: metaList.map((item) => ({
       value: JSON.stringify({
-        scheduledTimestamp: new Date().toISOString(),
-        vtuberMeta: m
+        scheduledTimestamp,
+        ...item
       })
     }))
   });
@@ -44,4 +61,6 @@ async function init() {
   console.info('finished, bye');
 }
 
-init().catch((err) => console.error(err));
+registerExitHook(async () => await fetchTaskScheduleProducer.disconnect());
+
+init();

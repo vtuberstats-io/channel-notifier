@@ -2,6 +2,8 @@ version: v1beta9
 vars:
   - name: ENV_KAFKA_BROKERS
     source: env
+  - name: ENV_MONGODB_URL
+    source: env
 images:
   app:
     image: devspace
@@ -28,6 +30,8 @@ deployments:
             env:
               - name: KAFKA_BROKERS
                 value: '${ENV_KAFKA_BROKERS}'
+              - name: MONGODB_URL
+                value: '${ENV_MONGODB_URL}'
         service:
           ports:
             - port: 9229

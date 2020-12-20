@@ -1,5 +1,5 @@
 {
-  "name": "fetch-task-notifier",
+  "name": "channel-notifier",
   "version": "0.0.1",
   "description": "a component of vtuberstats.io",
   "author": "darkyzhou",
@@ -10,7 +10,8 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "kafkajs": "^1.15.0"
+    "kafkajs": "^1.15.0",
+    "mongodb": "^3.6.3"
   },
   "devDependencies": {
     "prettier": "^2.2.1"
